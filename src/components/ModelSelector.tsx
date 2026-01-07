@@ -22,13 +22,13 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
             <div className="grid grid-cols-2 gap-2 p-1 bg-[var(--color-bg-primary)] rounded-xl border border-[var(--color-border-subtle)]">
                 <button
                     onClick={() => onModelChange(TTSModel.Flash)}
-                    className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg transition-all duration-300 cursor-pointer group
+                    className={`flex items-center justify-center gap-4 py-2.5 px-3 rounded-lg transition-all duration-100 cursor-pointer group
             ${selectedModel === TTSModel.Flash
                             ? 'bg-[var(--color-accent)] text-white shadow-md'
                             : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]'
                         }`}
                 >
-                    <Zap size={14} className={selectedModel === TTSModel.Flash ? 'text-white' : 'text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)]'} />
+                    <Zap size={18} className={selectedModel === TTSModel.Flash ? 'text-white' : 'text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)]'} />
                     <div className="flex flex-col items-start translate-y-[1px]">
                         <span className="text-xs font-bold leading-none mb-0.5">Flash</span>
                         <span className={`text-[9px] opacity-60 leading-none ${selectedModel === TTSModel.Flash ? 'text-white' : ''}`}>低延迟 / 高效率</span>
@@ -37,13 +37,13 @@ export function ModelSelector({ selectedModel, onModelChange }: ModelSelectorPro
 
                 <button
                     onClick={() => onModelChange(TTSModel.Pro)}
-                    className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg transition-all duration-300 cursor-pointer group
+                    className={`flex items-center justify-center gap-4 py-2.5 px-3 rounded-lg transition-all duration-100 cursor-pointer group
             ${selectedModel === TTSModel.Pro
                             ? 'bg-[var(--color-accent)] text-white shadow-md'
                             : 'text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)]'
                         }`}
                 >
-                    <Cpu size={14} className={selectedModel === TTSModel.Pro ? 'text-white' : 'text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)]'} />
+                    <Cpu size={18} className={selectedModel === TTSModel.Pro ? 'text-white' : 'text-[var(--color-text-secondary)] group-hover:text-[var(--color-accent)]'} />
                     <div className="flex flex-col items-start translate-y-[1px]">
                         <span className="text-xs font-bold leading-none mb-0.5">Pro</span>
                         <span className={`text-[9px] opacity-60 leading-none ${selectedModel === TTSModel.Pro ? 'text-white' : ''}`}>高质量 / 强推理</span>
