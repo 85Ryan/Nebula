@@ -51,7 +51,7 @@ export function VoicesModal({
                 </div>
 
                 {/* Sub-header / Search - Proactive enhancement if time permits, for now just a label */}
-                <div className="px-6 pt-4 bg-[var(--color-bg-secondary)]/30 flex items-center justify-between shrink-0">
+                <div className="px-6 py-4 bg-[var(--color-bg-secondary)]/30 flex items-center justify-between shrink-0">
                     <div className="flex gap-4">
                         <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-text-secondary)] opacity-50">共计 30 个音色</span>
                     </div>
@@ -66,7 +66,7 @@ export function VoicesModal({
                 </div>
 
                 {/* Body - Grid */}
-                <div className="flex-1 overflow-y-auto p-6 pb-12 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto px-6 pb-12 custom-scrollbar">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {voices.map((meta) => (
                             <div
