@@ -7,11 +7,14 @@ interface AudioPlayerProps {
     isGenerating: boolean;
     isPlaying: boolean;
     currentTime: number;
+    duration?: number; // Calculated effective duration
     onPlayPause: () => void;
 }
 
-export function AudioPlayer({ generatedAudio, isGenerating, isPlaying, currentTime, onPlayPause }: AudioPlayerProps) {
-    const progress = generatedAudio ? (currentTime / (generatedAudio.duration || 1)) * 100 : 0;
+export function AudioPlayer({ generatedAudio, isGenerating, isPlaying, currentTime, duration, onPlayPause }: AudioPlayerProps) {
+    // Use passed duration, or fallback to file duration, or 1 to avoid div by zero
+    const displayDuration = duration || generatedAudio?.duration || 1;
+    const progress = generatedAudio ? (currentTime / displayDuration) * 100 : 0;
 
     return (
         <div className="mt-4 flex flex-col bg-[var(--color-bg-secondary)] border border-[var(--color-border-subtle)] rounded-xl py-6 px-8 overflow-hidden relative">
@@ -46,7 +49,7 @@ export function AudioPlayer({ generatedAudio, isGenerating, isPlaying, currentTi
                         {isPlaying ? <Pause size={24} fill="currentColor" /> : <Play size={24} fill="currentColor" className="ml-1" />}
                     </button>
 
-                    <div className="flex-1 flex flex-col gap-4">
+                    <div className="flex-1 flex flex-col gap-2">
                         <div className="flex justify-between items-end">
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-bold text-[var(--color-accent)] uppercase tracking-widest mb-0.5">播放中</span>
@@ -55,7 +58,7 @@ export function AudioPlayer({ generatedAudio, isGenerating, isPlaying, currentTi
                             <div className="flex items-center gap-3 text-[10px] font-mono text-[var(--color-text-secondary)] bg-[var(--color-bg-primary)]/50 px-2.5 py-1 rounded border border-[var(--color-border-subtle)]">
                                 <span>{currentTime.toFixed(1)}s</span>
                                 <span className="opacity-30">/</span>
-                                <span>{generatedAudio.duration?.toFixed(1)}s</span>
+                                <span>{displayDuration.toFixed(1)}s</span>
                             </div>
                         </div>
 

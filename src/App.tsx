@@ -559,7 +559,11 @@ export default function App() {
     updateAudioNodeParams();
 
     const offset = pausedTimeRef.current % audioBufferRef.current.duration;
-    startTimeRef.current = audioContextRef.current.currentTime - (offset / settings.speed);
+    // Calculate effective rate
+    const effectiveRate = settings.speed * Math.pow(2, settings.pitch / 1200);
+
+    // startTime is Wall Clock Time when playback "started" (virtual 0 point)
+    startTimeRef.current = audioContextRef.current.currentTime - (offset / effectiveRate);
 
     source.start(0, offset);
     setIsPlaying(true);
@@ -577,8 +581,10 @@ export default function App() {
   const pauseAudio = () => {
     if (sourceNodeRef.current && audioContextRef.current) {
       sourceNodeRef.current.stop();
-      // 在停止时记录确切已播放时间
-      pausedTimeRef.current = (audioContextRef.current.currentTime - startTimeRef.current) * settings.speed;
+      // Calculate effective rate
+      const effectiveRate = settings.speed * Math.pow(2, settings.pitch / 1200);
+      // Store offset in BUFFER TIME
+      pausedTimeRef.current = (audioContextRef.current.currentTime - startTimeRef.current) * effectiveRate;
       setIsPlaying(false);
     }
   };
@@ -594,12 +600,27 @@ export default function App() {
     setCurrentTime(0);
   };
 
+  // Helper: Calculate effective playback rate considering both speed and pitch (detune)
+  // WebAudio: playbackRate affects speed. detune also affects speed (resampling).
+  // Total Rate = speed * (2 ^ (pitch / 1200))
+  const getEffectivePlaybackRate = () => {
+    return settings.speed * Math.pow(2, settings.pitch / 1200);
+  };
+
   useEffect(() => {
     let animFrame: number;
     const updateProgress = () => {
       if (isPlaying && audioContextRef.current && startTimeRef.current) {
-        const elapsed = (audioContextRef.current.currentTime - startTimeRef.current) * settings.speed;
+        // Use effective rate for elapsed time calculation
+        const effectiveRate = getEffectivePlaybackRate();
+        const elapsed = (audioContextRef.current.currentTime - startTimeRef.current) * effectiveRate;
+
+        // Effective Duration = Original Duration / Effective Rate
         const duration = audioBufferRef.current?.duration || 0;
+        // Don't modify duration here, "elapsed" is in terms of "buffer sample time".
+        // Wait, if I play at 2x, 1 real second = 2 buffer seconds.
+        // My elapsed logic `(now - start) * rate` tracks position in BUFFER.
+        // So `elapsed` is correct for comparison with `buffer.duration`.
 
         if (elapsed >= duration) {
           setIsPlaying(false);
@@ -616,7 +637,12 @@ export default function App() {
       animFrame = requestAnimationFrame(updateProgress);
     }
     return () => cancelAnimationFrame(animFrame);
-  }, [isPlaying, settings.speed]);
+  }, [isPlaying, settings.speed, settings.pitch]); // Add pitch dependency
+
+  // Calculate display duration for AudioPlayer
+  // Display Duration = Original Buffer Duration / Effective Rate (how long it takes to play in wall-clock time)
+  const effectivePlaybackRate = settings.speed * Math.pow(2, settings.pitch / 1200);
+  const displayDuration = generatedAudio ? (generatedAudio.duration || 0) / effectivePlaybackRate : 0;
 
   // -- Render --
 
@@ -653,7 +679,24 @@ export default function App() {
             generatedAudio={generatedAudio}
             isGenerating={isGenerating}
             isPlaying={isPlaying}
-            currentTime={currentTime}
+            // Logic: AudioPlayer expects "currentTime" in BUFFER time to show progress bar relative to Buffer Duration.
+            // BUT it expects "duration" for TEXT display in Wall-Clock time.
+            // This is mixed. 
+            // If I pass `displayDuration` for text, then `currentTime` passed should also be in Wall-Clock time?
+            // Current code passes `currentTime` which is BUFFER position.
+            // Old code: currentTime / generatedAudio.duration. This was BufferPos / BufferDur = % progress. Correct.
+            // New Text: {currentTime} / {displayDuration}.
+            // If I play 10s buffer at 2x. Wall time = 5s.
+            // At 1 real sec: BufferPos = 2s. Text shows "2.0s / 5.0s". This is confusing. 
+            // It should show "1.0s / 5.0s".
+            // So `currentTime` passed to AudioPlayer for TEXT should be Wall-Clock time.
+            // But for PROGRESS BAR, it needs %.
+            // WallTime / WallDuration = (BufferPos / Rate) / (BufferDur / Rate) = BufferPos / BufferDur.
+            // So Progress % is same.
+            // So I should convert `currentTime` (Buffer Pos) to Wall Time before passing?
+            // currentTime={currentTime / effectivePlaybackRate}
+            currentTime={currentTime / effectivePlaybackRate}
+            duration={displayDuration}
             onPlayPause={isPlaying ? pauseAudio : playAudio}
           />
         </main>
