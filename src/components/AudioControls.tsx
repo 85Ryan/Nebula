@@ -11,14 +11,14 @@ interface AudioControlsProps {
 export function AudioControls({ settings, onSettingsChange, onReset }: AudioControlsProps) {
     return (
         <div className="space-y-6">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-4">
                 <Sliders size={14} className="text-[var(--color-accent)]" />
                 <label className="text-[10px] font-bold text-[var(--color-text-secondary)] uppercase tracking-[0.2em]">声学特性精调</label>
             </div>
 
             <div className="space-y-7">
                 {/* Pitch */}
-                <div className="space-y-3">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
                         <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">音调调整 (Pitch)</label>
                         <span className="text-[11px] font-mono font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded">
@@ -37,7 +37,7 @@ export function AudioControls({ settings, onSettingsChange, onReset }: AudioCont
                 </div>
 
                 {/* Speed */}
-                <div className="space-y-3">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
                         <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">播放速度 (Speed)</label>
                         <span className="text-[11px] font-mono font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded">
@@ -56,7 +56,7 @@ export function AudioControls({ settings, onSettingsChange, onReset }: AudioCont
                 </div>
 
                 {/* Volume */}
-                <div className="space-y-3">
+                <div className="space-y-1">
                     <div className="flex justify-between items-center">
                         <label className="text-[11px] font-medium text-[var(--color-text-secondary)]">增益补偿 (Gain)</label>
                         <span className="text-[11px] font-mono font-bold text-[var(--color-accent)] bg-[var(--color-accent-soft)] px-2 py-0.5 rounded">
