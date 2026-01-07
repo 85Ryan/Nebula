@@ -9,15 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "react": "^19.2.3",
     "@google/genai": "^1.34.0",
     "lucide-react": "^0.562.0",
+    "react": "^19.2.3",
     "react-dom": "^19.2.3"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.1.18",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "tailwindcss": "^4.1.18",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"
-  }
+  },
+  "packageManager": "pnpm@8.12.1+sha512.6705ea1966adb6587053e6cfe6fddc377f81066228daf736c4490012f44f2ff1bf0c713bb8f3145fce0e3ef669c7c15f19a59ac157838951f234c17b81ca655d"
 }

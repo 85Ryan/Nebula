@@ -1,8 +1,9 @@
 import { TextFile } from './types';
 
 const DB_NAME = 'AetherVoiceDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'files';
+const PREVIEW_STORE = 'previews';
 
 const openDB = (): Promise<IDBDatabase> => {
   return new Promise((resolve, reject) => {
@@ -12,6 +13,9 @@ const openDB = (): Promise<IDBDatabase> => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+      }
+      if (!db.objectStoreNames.contains(PREVIEW_STORE)) {
+        db.createObjectStore(PREVIEW_STORE); // key will be voiceId
       }
     };
 
@@ -61,6 +65,30 @@ export const deleteFile = async (id: string): Promise<void> => {
     const request = store.delete(id);
 
     request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const savePreview = async (voiceId: string, blob: Blob): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([PREVIEW_STORE], 'readwrite');
+    const store = transaction.objectStore(PREVIEW_STORE);
+    const request = store.put(blob, voiceId);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+};
+
+export const getPreview = async (voiceId: string): Promise<Blob | null> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([PREVIEW_STORE], 'readonly');
+    const store = transaction.objectStore(PREVIEW_STORE);
+    const request = store.get(voiceId);
+
+    request.onsuccess = () => resolve(request.result || null);
     request.onerror = () => reject(request.error);
   });
 };
