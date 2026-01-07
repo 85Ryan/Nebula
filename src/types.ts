@@ -3,6 +3,8 @@ export interface TextFile {
   title: string;
   content: string;
   prompt?: string;
+  audioBlob?: Blob; // Persist the latest generated audio
+  audioDuration?: number; // Duration for playback
   createdAt: number;
 }
 

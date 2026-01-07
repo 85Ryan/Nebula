@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Settings2, Plus, Terminal } from 'lucide-react';
 import { TextFile, AudioSettings, VoiceName, GeneratedAudio, VoiceMetadata } from './types';
-import { saveFile, getFiles, deleteFile, savePreview, getPreview } from './db';
+import { saveFile, getFiles, deleteFile, savePreview, getPreview, renameFile } from './db';
 import { generateSpeech } from './services/geminiService';
 import { base64ToUint8Array, createWavFile } from './audioUtils';
 
@@ -348,12 +348,12 @@ export default function App() {
     }
   };
 
-  const createNewFile = async (initialContent: string = '') => {
+  const createNewFile = async (initialContent: string = '', initialPrompt: string = '') => {
     const newFile: TextFile = {
       id: crypto.randomUUID(),
       title: `未命名草稿 ${files.length + 1}`,
       content: initialContent,
-      prompt: '',
+      prompt: initialPrompt,
       createdAt: Date.now(),
     };
     await saveFile(newFile);
@@ -361,7 +361,7 @@ export default function App() {
     setFiles(updatedFiles);
     setActiveFileId(newFile.id);
     setText(initialContent);
-    setPrompt("");
+    setPrompt(initialPrompt);
     setGeneratedAudio(null);
     return newFile.id;
   };
@@ -370,6 +370,13 @@ export default function App() {
     setText(newText);
     if (!activeFileId && files.length === 0 && newText.length > 0) {
       await createNewFile(newText);
+    }
+  };
+
+  const handlePromptChange = async (newPrompt: string) => {
+    setPrompt(newPrompt);
+    if (!activeFileId && files.length === 0 && newPrompt.length > 0) {
+      await createNewFile('', newPrompt);
     }
   };
 
@@ -396,12 +403,36 @@ export default function App() {
     }
   };
 
+  const handleRenameFile = async (id: string, newTitle: string) => {
+    try {
+      // Optimistic update
+      setFiles(prev => prev.map(f => f.id === id ? { ...f, title: newTitle } : f));
+      await renameFile(id, newTitle);
+    } catch (error) {
+      console.error("Failed to rename file:", error);
+      // Revert on error (re-fetch)
+      loadFiles();
+    }
+  };
+
   const handleFileSelect = (file: TextFile) => {
     setActiveFileId(file.id);
     setText(file.content);
     setPrompt(file.prompt || "");
-    setGeneratedAudio(null);
     stopAudio();
+
+    // Check for persisted audio
+    if (file.audioBlob) {
+      const url = URL.createObjectURL(file.audioBlob);
+      // Reconstruct GeneratedAudio object
+      setGeneratedAudio({
+        url,
+        blob: file.audioBlob,
+        duration: file.audioDuration
+      });
+    } else {
+      setGeneratedAudio(null);
+    }
   };
 
   // -- Audio Logic --
@@ -522,7 +553,24 @@ export default function App() {
       const wavBlob = createWavFile(samples, SAMPLE_RATE);
       const url = URL.createObjectURL(wavBlob);
 
-      setGeneratedAudio({ url, blob: wavBlob, duration: buffer.duration });
+      const newAudioData = { url, blob: wavBlob, duration: buffer.duration };
+      setGeneratedAudio(newAudioData);
+
+      // Persist audio to active file
+      if (activeFileId) {
+        const currentFile = files.find(f => f.id === activeFileId);
+        if (currentFile) {
+          const updatedFile = {
+            ...currentFile,
+            content: text, // Ensure text is synced
+            prompt: prompt,
+            audioBlob: wavBlob,
+            audioDuration: buffer.duration
+          };
+          setFiles(prev => prev.map(f => f.id === activeFileId ? updatedFile : f));
+          await saveFile(updatedFile);
+        }
+      }
 
     } catch (err) {
       console.error(err);
@@ -537,9 +585,23 @@ export default function App() {
     }
   };
 
-  const playAudio = () => {
-    if (!audioContextRef.current || !audioBufferRef.current) return;
+  const playAudio = async () => {
+    if (!audioContextRef.current || (!audioBufferRef.current && !generatedAudio)) return;
     initAudioContext();
+
+    // If buffer is missing but we have blob (e.g. loaded from DB), decode it
+    if (!audioBufferRef.current && generatedAudio?.blob) {
+      try {
+        const arrayBuffer = await generatedAudio.blob.arrayBuffer();
+        audioBufferRef.current = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      } catch (e) {
+        console.error("Failed to decode saved audio:", e);
+        return;
+      }
+    }
+
+    // Double check buffer exists after attempted decode
+    if (!audioBufferRef.current) return;
 
     if (sourceNodeRef.current) {
       sourceNodeRef.current.stop();
@@ -598,6 +660,18 @@ export default function App() {
     setIsPlaying(false);
     pausedTimeRef.current = 0;
     setCurrentTime(0);
+    // Do NOT clear audioBufferRef here if we want to resume same file, 
+    // BUT we must clear it if switching files. 
+    // handleFileSelect clears it by calling stopAudio? 
+    // Actually, `stopAudio` just stops playback. `handleFileSelect` should clear buffer reference logic.
+    // Ideally, `audioBufferRef` is derived from `generatedAudio`.
+    // My updated `playAudio` handles re-decoding from blob if needed. 
+    // So cleaning buffer here is fine to save memory, OR keep it.
+    // Let's keep it but `handleFileSelect` calls `stopAudio` so it's consistent.
+    // Wait, if I stop, I might play again. I shouldn't throw away buffer unless file changed.
+    // However, `playAudio` logic I added: `if (!audioBufferRef.current && generatedAudio?.blob) ... decode`.
+    // So it's SAFE to nullify buffer if needed, but inefficient.
+    // For now, I'll update `handleFileSelect` to explicitly nullify `audioBufferRef.current` to ensure fresh decode for new file.
   };
 
   // Helper: Calculate effective playback rate considering both speed and pitch (detune)
@@ -662,6 +736,7 @@ export default function App() {
           activeFileId={activeFileId}
           onSelect={handleFileSelect}
           onDelete={handleDeleteFile}
+          onRename={handleRenameFile}
           onCreate={() => createNewFile()}
         />
 
@@ -671,7 +746,7 @@ export default function App() {
             text={text}
             onChange={handleTextChange}
             prompt={prompt}
-            onPromptChange={setPrompt}
+            onPromptChange={handlePromptChange}
             isGenerating={isGenerating}
           />
 

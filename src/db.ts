@@ -1,6 +1,6 @@
 import { TextFile } from './types';
 
-const DB_NAME = 'AetherVoiceDB';
+const DB_NAME = 'NebulaVoiceDB';
 const DB_VERSION = 2;
 const STORE_NAME = 'files';
 const PREVIEW_STORE = 'previews';
@@ -66,6 +66,28 @@ export const deleteFile = async (id: string): Promise<void> => {
 
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error);
+  });
+};
+
+export const renameFile = async (id: string, newTitle: string): Promise<void> => {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], 'readwrite');
+    const store = transaction.objectStore(STORE_NAME);
+    const getRequest = store.get(id);
+
+    getRequest.onsuccess = () => {
+      const file = getRequest.result as TextFile;
+      if (file) {
+        file.title = newTitle;
+        const putRequest = store.put(file);
+        putRequest.onsuccess = () => resolve();
+        putRequest.onerror = () => reject(putRequest.error);
+      } else {
+        reject(new Error('File not found'));
+      }
+    };
+    getRequest.onerror = () => reject(getRequest.error);
   });
 };
 
