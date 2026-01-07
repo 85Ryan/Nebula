@@ -86,10 +86,10 @@ export function VoiceSelector({
 
                 <button
                     onClick={onOpenModal}
-                    className="mt-2 w-full flex items-center justify-center p-1 bg-[var(--color-bg-secondary)]/50 hover:bg-[var(--color-bg-secondary)] border-t border-[var(--color-glass-border)] transition-all group"
+                    className="mt-2 w-full flex items-center justify-center p-0.5 bg-[var(--color-bg-hover)]/30 hover:bg-[var(--color-bg-hover)]/60 transition-all group"
                     title="显示全部声音"
                 >
-                    <ChevronDown size={16} className="text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-transform group-hover:translate-y-0.5" />
+                    <ChevronDown size={14} className="text-[var(--color-text-secondary)] group-hover:text-[var(--color-text-primary)] transition-transform group-hover:translate-y-0.5" />
                 </button>
             </div>
         </div>

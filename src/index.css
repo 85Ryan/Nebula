@@ -14,6 +14,7 @@
 
   --color-bg-primary: var(--bg-primary);
   --color-bg-secondary: var(--bg-secondary);
+  --color-bg-hover: var(--bg-hover);
   --color-text-primary: var(--text-primary);
   --color-text-secondary: var(--text-secondary);
   --color-border-subtle: var(--border-subtle);
@@ -23,6 +24,7 @@
   /* Dark Theme Default */
   --bg-primary: #09090b;
   --bg-secondary: #0e0e11;
+  --bg-hover: #1e1e21;
   --text-primary: #fafafa;
   --text-secondary: #a1a1aa;
   --border-subtle: rgba(255, 255, 255, 0.04);
@@ -37,6 +39,7 @@
 :root.light {
   --bg-primary: #ffffff;
   --bg-secondary: #fbfbfc;
+  --bg-hover: #e5e5e7;
   --text-primary: #09090b;
   --text-secondary: #71717a;
   --border-subtle: rgba(0, 0, 0, 0.04);
@@ -52,6 +55,7 @@
   :root:not(.dark) {
     --bg-primary: #ffffff;
     --bg-secondary: #fbfbfc;
+    --bg-hover: #e5e5e7;
     --text-primary: #09090b;
     --text-secondary: #71717a;
     --border-subtle: rgba(0, 0, 0, 0.04);
