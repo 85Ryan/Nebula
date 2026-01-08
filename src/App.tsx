@@ -15,6 +15,7 @@ import { Header } from './components/Header';
 import { SettingsModal } from './components/SettingsModal';
 import { ModelSelector } from './components/ModelSelector';
 import { VoicesModal } from './components/VoicesModal';
+import { ToneToolbar } from './components/ToneToolbar';
 import { TTSModel } from './types';
 
 // --- Constants & Data ---
