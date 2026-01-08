@@ -7,6 +7,8 @@ import { base64ToUint8Array, createWavFile } from './audioUtils';
 
 // Components
 import { Sidebar } from './components/Sidebar';
+import { Toast, ToastType } from './components/Toast';
+import { AlertDialog, DialogType } from './components/AlertDialog';
 import { VoiceSelector } from './components/VoiceSelector';
 import { AudioControls } from './components/AudioControls';
 import { TextInput } from './components/TextInput';
@@ -284,6 +286,50 @@ export default function App() {
   const audioBufferRef = useRef<AudioBuffer | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
 
+  // -- UI State --
+  const [toast, setToast] = useState<{ visible: boolean; message: string; type: ToastType }>({
+    visible: false,
+    message: '',
+    type: 'info'
+  });
+
+  const [dialog, setDialog] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    type: DialogType;
+    confirmText?: string;
+    onConfirm?: () => void;
+  }>({
+    isOpen: false,
+    title: '',
+    message: '',
+    type: 'info'
+  });
+
+  const showToast = (message: string, type: ToastType = 'info') => {
+    setToast({ visible: true, message, type });
+  };
+
+  const closeToast = () => {
+    setToast(prev => ({ ...prev, visible: false }));
+  };
+
+  const showDialog = (type: DialogType, title: string, message: string, onConfirm?: () => void, confirmText?: string) => {
+    setDialog({
+      isOpen: true,
+      type,
+      title,
+      message,
+      onConfirm,
+      confirmText
+    });
+  };
+
+  const closeDialog = () => {
+    setDialog(prev => ({ ...prev, isOpen: false }));
+  };
+
   // -- Effects --
 
   useEffect(() => {
@@ -381,27 +427,34 @@ export default function App() {
     }
   };
 
-  const handleDeleteFile = async (e: React.MouseEvent, id: string) => {
+  const handleDeleteFile = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    if (!confirm('确定要删除这个文件吗？')) return;
+    showDialog(
+      'confirm',
+      '删除确认',
+      '确定要永久删除这个文件吗？此操作无法撤销。',
+      async () => {
+        await deleteFile(id);
+        const remaining = await getFiles();
+        setFiles(remaining);
 
-    await deleteFile(id);
-    const remaining = await getFiles();
-    setFiles(remaining);
-
-    if (activeFileId === id) {
-      if (remaining.length > 0) {
-        setActiveFileId(remaining[0].id);
-        setText(remaining[0].content);
-        setPrompt(remaining[0].prompt || "");
-      } else {
-        setActiveFileId(null);
-        setText('');
-        setPrompt('');
-      }
-      setGeneratedAudio(null);
-      stopAudio();
-    }
+        if (activeFileId === id) {
+          if (remaining.length > 0) {
+            setActiveFileId(remaining[0].id);
+            setText(remaining[0].content);
+            setPrompt(remaining[0].prompt || "");
+          } else {
+            setActiveFileId(null);
+            setText('');
+            setPrompt('');
+          }
+          setGeneratedAudio(null);
+          stopAudio();
+        }
+        closeDialog(); // Logic completed, close dialog
+      },
+      '确认删除'
+    );
   };
 
   const handleRenameFile = async (id: string, newTitle: string) => {
@@ -516,8 +569,9 @@ export default function App() {
     } catch (err) {
       console.error(err);
       if (String(err).includes('403') || String(err).includes('Key')) {
-        alert('密钥验证失败，请在设置中更新您的 API KEY。');
-        setIsSettingsOpen(true);
+        showDialog('error', '鉴权失败', '密钥验证失败，请在设置中更新您的 API KEY。', () => setIsSettingsOpen(true), '去设置');
+      } else {
+        showDialog('error', '预览失败', '无法生成语音预览，请稍后重试。');
       }
       setPreviewingVoice(null);
     }
@@ -573,13 +627,15 @@ export default function App() {
         }
       }
 
+      // Show Success Toast
+      showToast('音频生成完成', 'success');
+
     } catch (err) {
       console.error(err);
       if (String(err).includes('403') || String(err).includes('Key')) {
-        alert('API Key 无效或过期，请点击设置图标更新。');
-        setIsSettingsOpen(true);
+        showDialog('error', '鉴权失败', 'API Key 无效或过期，请点击设置图标更新。', () => setIsSettingsOpen(true), '去设置');
       } else {
-        alert("服务器响应超时，请确认 API Key 是否正确并重试。");
+        showDialog('error', '生成失败', `服务器响应超时或发生错误: ${String(err)}`);
       }
     } finally {
       setIsGenerating(false);
@@ -863,6 +919,23 @@ export default function App() {
           <Plus size={28} />
         </button>
       </div>
+
+      {/* Custom UI Overlays */}
+      <Toast
+        message={toast.message}
+        type={toast.type}
+        isVisible={toast.visible}
+        onClose={closeToast}
+      />
+      <AlertDialog
+        isOpen={dialog.isOpen}
+        title={dialog.title}
+        message={dialog.message}
+        type={dialog.type}
+        onConfirm={dialog.onConfirm}
+        onCancel={closeDialog}
+        confirmText={dialog.confirmText}
+      />
     </div>
   );
 }
