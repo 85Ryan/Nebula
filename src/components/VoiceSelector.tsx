@@ -33,6 +33,17 @@ export function VoiceSelector({
         recommendations.push(...others.slice(0, 5 - recommendations.length));
     }
 
+    // Dynamic import of all avatars
+    const avatarGlob = import.meta.glob('/src/assets/avatars/*.png', { eager: true, query: '?url', import: 'default' });
+
+    // Helper to get bundled URL
+    const getAvatarSrc = (name: string) => {
+        // Try exact match first
+        const path = `/src/assets/avatars/${name}.png`;
+        if (avatarGlob[path]) return avatarGlob[path];
+        return null;
+    };
+
     const displayedVoices = [selectedVoiceId, ...recommendations];
 
     return (
@@ -49,6 +60,7 @@ export function VoiceSelector({
                     {displayedVoices.map((v) => {
                         const meta = voiceMeta[v];
                         const isSelected = v === selectedVoiceId;
+                        const avatarSrc = getAvatarSrc(meta.name);
                         return (
                             <button
                                 key={v}
@@ -59,9 +71,9 @@ export function VoiceSelector({
                                     ${isSelected ? 'border-[var(--color-accent)] shadow-[0_0_15px_var(--accent-soft)]' : 'border-transparent group-hover:border-[var(--color-glass-border)]'}`}>
                                     <div className="w-full h-full rounded-full overflow-hidden bg-gradient-to-b from-[var(--color-bg-secondary)] to-[var(--color-bg-primary)] border border-[var(--color-glass-border)] flex items-center justify-center">
                                         <img
-                                            src={`/avatars/${meta.name}.png`}
+                                            src={avatarSrc || `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`}
                                             alt={meta.name}
-                                            className="w-full h-full object-contain p-1"
+                                            className={`w-full h-full object-contain ${avatarSrc ? 'p-1' : 'object-cover'}`}
                                             onError={(e) => {
                                                 // Fallback to initial
                                                 const target = e.target as HTMLImageElement;

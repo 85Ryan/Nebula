@@ -21,6 +21,20 @@ export function VoicesModal({
 }: VoicesModalProps) {
     const voices = Object.values(voiceMeta);
 
+    // Dynamic import of all avatars
+    const avatarGlob = import.meta.glob('/src/assets/avatars/*.png', { eager: true, query: '?url', import: 'default' });
+
+    // Helper to get bundled URL
+    const getAvatarSrc = (name: string) => {
+        // Try exact match first
+        const path = `/src/assets/avatars/${name}.png`;
+        if (avatarGlob[path]) return avatarGlob[path];
+
+        // Fallback or debug
+        // console.warn(`Missing avatar bundle for: ${name}`);
+        return null;
+    };
+
     return (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
             {/* Backdrop */}
@@ -68,99 +82,102 @@ export function VoicesModal({
                 {/* Body - Grid */}
                 <div className="flex-1 overflow-y-auto px-6 pb-12 custom-scrollbar">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {voices.map((meta) => (
-                            <div
-                                key={meta.id}
-                                className={`group flex flex-col p-4 rounded-xl border transition-all duration-300 relative
+                        {voices.map((meta) => {
+                            const avatarSrc = getAvatarSrc(meta.name);
+                            return (
+                                <div
+                                    key={meta.id}
+                                    className={`group flex flex-col p-4 rounded-xl border transition-all duration-300 relative
                                     ${selectedVoice === meta.id
-                                        ? 'bg-[var(--color-accent-soft)] border-[var(--color-accent)]'
-                                        : 'bg-transparent border-[var(--color-glass-border)]/75 hover:border-[var(--color-glass-border)] hover:bg-[var(--color-bg-secondary)]'}`}
-                            >
-                                <div className="flex items-start gap-4">
-                                    {/* Avatar */}
-                                    <div className="relative shrink-0">
-                                        <div className={`w-14 h-14 rounded-full overflow-hidden border-2 transition-all
+                                            ? 'bg-[var(--color-accent-soft)] border-[var(--color-accent)]'
+                                            : 'bg-transparent border-[var(--color-glass-border)]/75 hover:border-[var(--color-glass-border)] hover:bg-[var(--color-bg-secondary)]'}`}
+                                >
+                                    <div className="flex items-start gap-4">
+                                        {/* Avatar */}
+                                        <div className="relative shrink-0">
+                                            <div className={`w-14 h-14 rounded-full overflow-hidden border-2 transition-all
                                             ${selectedVoice === meta.id ? 'border-[var(--color-accent)]' : 'border-transparent group-hover:border-[var(--color-glass-border)]'}`}>
-                                            <img
-                                                src={`/avatars/${meta.name}.png`}
-                                                alt={meta.name}
-                                                className="w-full h-full p-1 object-contain rounded-full bg-gradient-to-b from-[var(--color-bg-secondary)] to-[var(--color-bg-primary)]"
-                                                onError={(e) => {
-                                                    // Fallback to initial
-                                                    const target = e.target as HTMLImageElement;
-                                                    target.src = `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`;
-                                                    target.classList.remove('object-contain', 'p-1');
-                                                    target.classList.add('object-cover');
-                                                }}
-                                            />
-                                        </div>
-                                        {selectedVoice === meta.id && (
-                                            <div className="absolute -bottom-0 -right-0 w-4 h-4 bg-[var(--color-accent)] text-white rounded-full flex items-center justify-center shadow-lg animate-fade-in">
-                                                <Check size={10} strokeWidth={3} />
+                                                <img
+                                                    src={avatarSrc || `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`}
+                                                    alt={meta.name}
+                                                    className={`w-full h-full object-contain bg-gradient-to-b from-[var(--color-bg-secondary)] to-[var(--color-bg-primary)] ${avatarSrc ? 'p-1' : 'object-cover'}`}
+                                                    onError={(e) => {
+                                                        // Fallback to initial
+                                                        const target = e.target as HTMLImageElement;
+                                                        target.src = `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`;
+                                                        target.classList.remove('object-contain', 'p-1');
+                                                        target.classList.add('object-cover');
+                                                    }}
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <h3 className="font-bold text-[var(--color-text-primary)] truncate">{meta.name}</h3>
-                                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase
-                                                ${meta.gender === 'Female' ? 'bg-pink-500/10 text-pink-500' : 'bg-blue-500/10 text-blue-500'}`}>
-                                                {meta.gender === 'Female' ? '女' : '男'}
-                                            </span>
-                                        </div>
-                                        <div className="flex flex-wrap gap-1 mb-2">
-                                            {meta.tags.map(tag => (
-                                                <span key={tag} className="text-[9px] px-1.5 py-0.5 bg-[var(--color-bg-primary)]/50 text-[var(--color-text-secondary)] rounded-md border border-[var(--color-glass-border)]">
-                                                    {tag}
-                                                </span>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-2 mt-3 mb-4 flex-1">
-                                    {meta.description}
-                                </p>
-
-                                <div className="flex items-center gap-2 mt-auto">
-                                    <button
-                                        onClick={(e) => onPreview(e, meta.id)}
-                                        disabled={previewingVoice !== null}
-                                        className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all
-                                            ${previewingVoice === meta.id
-                                                ? 'bg-[var(--color-accent)] text-white'
-                                                : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-glass-border)]'}`}
-                                    >
-                                        {previewingVoice === meta.id ? (
-                                            <>
-                                                <div className="flex gap-0.5 items-end mb-0.5">
-                                                    <div className="w-0.5 h-2 bg-current animate-[wave_1s_infinite] origin-bottom"></div>
-                                                    <div className="w-0.5 h-3 bg-current animate-[wave_1s_infinite_-0.2s] origin-bottom"></div>
-                                                    <div className="w-0.5 h-1.5 bg-current animate-[wave_1s_infinite_-0.4s] origin-bottom"></div>
-                                                    <div className="w-0.5 h-1 bg-current animate-[wave_1s_infinite_-0.6s] origin-bottom"></div>
+                                            {selectedVoice === meta.id && (
+                                                <div className="absolute -bottom-0 -right-0 w-4 h-4 bg-[var(--color-accent)] text-white rounded-full flex items-center justify-center shadow-lg animate-fade-in">
+                                                    <Check size={10} strokeWidth={3} />
                                                 </div>
-                                                试听中...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <Volume2 size={12} />
-                                                试听音色
-                                            </>
-                                        )}
-                                    </button>
-                                    <button
-                                        onClick={() => onSelect(meta.id)}
-                                        className={`px-4 py-2 rounded-lg text-xs font-bold transition-all
+                                            )}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 mb-1">
+                                                <h3 className="font-bold text-[var(--color-text-primary)] truncate">{meta.name}</h3>
+                                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase
+                                                ${meta.gender === 'Female' ? 'bg-pink-500/10 text-pink-500' : 'bg-blue-500/10 text-blue-500'}`}>
+                                                    {meta.gender === 'Female' ? '女' : '男'}
+                                                </span>
+                                            </div>
+                                            <div className="flex flex-wrap gap-1 mb-2">
+                                                {meta.tags.map(tag => (
+                                                    <span key={tag} className="text-[9px] px-1.5 py-0.5 bg-[var(--color-bg-primary)]/50 text-[var(--color-text-secondary)] rounded-md border border-[var(--color-glass-border)]">
+                                                        {tag}
+                                                    </span>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <p className="text-[11px] text-[var(--color-text-secondary)] line-clamp-2 mt-3 mb-4 flex-1">
+                                        {meta.description}
+                                    </p>
+
+                                    <div className="flex items-center gap-2 mt-auto">
+                                        <button
+                                            onClick={(e) => onPreview(e, meta.id)}
+                                            disabled={previewingVoice !== null}
+                                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all
+                                            ${previewingVoice === meta.id
+                                                    ? 'bg-[var(--color-accent)] text-white'
+                                                    : 'bg-[var(--color-bg-primary)] text-[var(--color-text-secondary)] hover:text-[var(--color-text-primary)] border border-[var(--color-glass-border)]'}`}
+                                        >
+                                            {previewingVoice === meta.id ? (
+                                                <>
+                                                    <div className="flex gap-0.5 items-end mb-0.5">
+                                                        <div className="w-0.5 h-2 bg-current animate-[wave_1s_infinite] origin-bottom"></div>
+                                                        <div className="w-0.5 h-3 bg-current animate-[wave_1s_infinite_-0.2s] origin-bottom"></div>
+                                                        <div className="w-0.5 h-1.5 bg-current animate-[wave_1s_infinite_-0.4s] origin-bottom"></div>
+                                                        <div className="w-0.5 h-1 bg-current animate-[wave_1s_infinite_-0.6s] origin-bottom"></div>
+                                                    </div>
+                                                    试听中...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Volume2 size={12} />
+                                                    试听音色
+                                                </>
+                                            )}
+                                        </button>
+                                        <button
+                                            onClick={() => onSelect(meta.id)}
+                                            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all
                                             ${selectedVoice === meta.id
-                                                ? 'bg-[var(--color-accent)] text-white shadow-[0_4px_12px_var(--accent-soft)]'
-                                                : 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white'}`}
-                                    >
-                                        {selectedVoice === meta.id ? '已选择' : '选择'}
-                                    </button>
+                                                    ? 'bg-[var(--color-accent)] text-white shadow-[0_4px_12px_var(--accent-soft)]'
+                                                    : 'bg-[var(--color-accent)]/10 text-[var(--color-accent)] hover:bg-[var(--color-accent)] hover:text-white'}`}
+                                        >
+                                            {selectedVoice === meta.id ? '已选择' : '选择'}
+                                        </button>
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             </div>
