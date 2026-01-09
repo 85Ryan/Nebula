@@ -63,7 +63,11 @@ export function VoiceSelector({
                                             alt={meta.name}
                                             className="w-full h-full object-contain p-1"
                                             onError={(e) => {
-                                                (e.target as HTMLImageElement).src = `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`;
+                                                // Fallback to initial
+                                                const target = e.target as HTMLImageElement;
+                                                target.src = `https://ui-avatars.com/api/?name=${meta.name}&background=random&color=fff&size=128`;
+                                                target.classList.remove('object-contain', 'p-1');
+                                                target.classList.add('object-cover');
                                             }}
                                         />
                                     </div>
