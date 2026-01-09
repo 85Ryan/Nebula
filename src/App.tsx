@@ -261,15 +261,8 @@ export default function App() {
   const [activeFileId, setActiveFileId] = useState<string | null>(null);
   const [text, setText] = useState<string>("");
   const [prompt, setPrompt] = useState<string>("");
-  const [settings, setSettings] = useState<AudioSettings>(() => {
-    const saved = localStorage.getItem('tts_settings');
-    const parsed = saved ? JSON.parse(saved) : DEFAULT_SETTINGS;
-    return parsed;
-  });
-
-  const [selectedModel, setSelectedModel] = useState<TTSModel>(() => {
-    return (localStorage.getItem('tts_model') as TTSModel) || TTSModel.Flash;
-  });
+  const [settings, setSettings] = useState<AudioSettings>(DEFAULT_SETTINGS);
+  const [selectedModel, setSelectedModel] = useState<TTSModel>(TTSModel.Flash);
 
   const [isGenerating, setIsGenerating] = useState(false);
   const [previewingVoice, setPreviewingVoice] = useState<VoiceName | null>(null);
@@ -339,36 +332,45 @@ export default function App() {
   }, [theme]);
 
   useEffect(() => {
-    localStorage.setItem('tts_model', selectedModel);
-  }, [selectedModel]);
+    updateAudioNodeParams();
+  }, [settings]);
 
   useEffect(() => {
     loadFiles();
-    // Check if API Key exists, if not open settings
     if (!localStorage.getItem('gemini_api_key')) {
       setIsSettingsOpen(true);
     }
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem('tts_settings', JSON.stringify(settings));
-    updateAudioNodeParams();
-  }, [settings]);
 
   // Auto-save logic
   useEffect(() => {
     const saveTimeout = setTimeout(() => {
       if (activeFileId) {
         const file = files.find(f => f.id === activeFileId);
-        if (file && (file.content !== text || file.prompt !== prompt)) {
-          const updatedFile = { ...file, content: text, prompt };
-          setFiles(prev => prev.map(f => f.id === activeFileId ? updatedFile : f));
-          saveFile(updatedFile);
+        // Deep check is cleaner, but for now simple check
+        if (file) {
+          const hasChanged =
+            file.content !== text ||
+            file.prompt !== prompt ||
+            JSON.stringify(file.settings) !== JSON.stringify(settings) ||
+            file.model !== selectedModel;
+
+          if (hasChanged) {
+            const updatedFile = {
+              ...file,
+              content: text,
+              prompt,
+              settings,
+              model: selectedModel
+            };
+            setFiles(prev => prev.map(f => f.id === activeFileId ? updatedFile : f));
+            saveFile(updatedFile);
+          }
         }
       }
     }, 800);
     return () => clearTimeout(saveTimeout);
-  }, [text, prompt, activeFileId]);
+  }, [text, prompt, activeFileId, settings, selectedModel]);
 
   useEffect(() => {
     return () => {
@@ -389,9 +391,26 @@ export default function App() {
     const loadedFiles = await getFiles();
     setFiles(loadedFiles);
     if (!activeFileId && loadedFiles.length > 0) {
-      setActiveFileId(loadedFiles[0].id);
-      setText(loadedFiles[0].content);
-      setPrompt(loadedFiles[0].prompt || "");
+      const firstFile = loadedFiles[0];
+      setActiveFileId(firstFile.id);
+      setText(firstFile.content);
+      setPrompt(firstFile.prompt || "");
+
+      if (firstFile.audioBlob) {
+        const url = URL.createObjectURL(firstFile.audioBlob);
+        setGeneratedAudio({
+          url,
+          blob: firstFile.audioBlob,
+          duration: firstFile.audioDuration
+        });
+      }
+
+      // Hydrate settings
+      if (firstFile.settings) setSettings(firstFile.settings);
+      else setSettings(DEFAULT_SETTINGS);
+
+      if (firstFile.model) setSelectedModel(firstFile.model);
+      else setSelectedModel(TTSModel.Flash);
     }
   };
 
@@ -409,6 +428,8 @@ export default function App() {
     setActiveFileId(newFile.id);
     setText(initialContent);
     setPrompt(initialPrompt);
+    setSettings(DEFAULT_SETTINGS);
+    setSelectedModel(TTSModel.Flash);
     setGeneratedAudio(null);
     return newFile.id;
   };
@@ -474,11 +495,11 @@ export default function App() {
     setText(file.content);
     setPrompt(file.prompt || "");
     stopAudio();
+    audioBufferRef.current = null;
 
-    // Check for persisted audio
+    // Reconstruct GeneratedAudio object
     if (file.audioBlob) {
       const url = URL.createObjectURL(file.audioBlob);
-      // Reconstruct GeneratedAudio object
       setGeneratedAudio({
         url,
         blob: file.audioBlob,
@@ -487,6 +508,13 @@ export default function App() {
     } else {
       setGeneratedAudio(null);
     }
+
+    // Hydrate settings
+    if (file.settings) setSettings(file.settings);
+    else setSettings(DEFAULT_SETTINGS);
+
+    if (file.model) setSelectedModel(file.model);
+    else setSelectedModel(TTSModel.Flash);
   };
 
   // -- Audio Logic --
@@ -643,8 +671,8 @@ export default function App() {
   };
 
   const playAudio = async () => {
-    if (!audioContextRef.current || (!audioBufferRef.current && !generatedAudio)) return;
     initAudioContext();
+    if (!audioContextRef.current || (!audioBufferRef.current && !generatedAudio)) return;
 
     // If buffer is missing but we have blob (e.g. loaded from DB), decode it
     if (!audioBufferRef.current && generatedAudio?.blob) {

@@ -5,6 +5,8 @@ export interface TextFile {
   prompt?: string;
   audioBlob?: Blob; // Persist the latest generated audio
   audioDuration?: number; // Duration for playback
+  settings?: AudioSettings; // Saved generation parameters
+  model?: TTSModel; // Saved model selection
   createdAt: number;
 }
 
