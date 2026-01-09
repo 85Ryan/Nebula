@@ -40,10 +40,10 @@ export function Header({ onOpenSettings, theme, onThemeChange }: HeaderProps) {
     const themes: ('light' | 'dark' | 'system')[] = ['light', 'dark', 'system'];
 
     return (
-        <header className="h-14 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] flex items-center justify-between px-6 shrink-0 z-50">
+        <header className="h-14 border-b border-[var(--color-border-subtle)] bg-[var(--color-bg-primary)] flex items-center justify-between px-4 shrink-0 z-50">
             <div className="flex items-center gap-2.5 group cursor-default">
-                <div className="w-7 h-7 rounded bg-[var(--color-accent)] flex items-center justify-center shadow-[0_0_15px_var(--accent-soft)]">
-                    <Sparkles size={14} className="text-white" />
+                <div className="w-7 h-7 flex items-center justify-center">
+                    <img src="/logo.svg" alt="Nebula Logo" className="w-full h-full" />
                 </div>
                 <div className="flex flex-col">
                     <h1 className="text-xs font-bold tracking-[0.2em] text-[var(--color-text-primary)]">NEBULA</h1>
