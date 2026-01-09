@@ -12,17 +12,23 @@ interface TextInputProps {
 // Helper: highlight [TAG] text
 const highlightText = (text: string) => {
     if (!text) return '';
-    // Regex matches [TAG] or [/TAG]
-    const parts = text.split(/(\[[A-Z_]+\]|\[\/[A-Z_]+\])/g);
-    return parts.map(part => {
-        if (part.match(/^\[[A-Z_]+\]$/) || part.match(/^\[\/[A-Z_]+\]$/)) {
-            return `<span class="tag-highlight">${part}</span>`;
+
+    // Escape HTML first to prevent injection from user content
+    const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    // Regex Explanation:
+    // (\[[A-Z_]+\]|\[\/[A-Z_]+\])  -> Group 1: Matches [EXPLOSIVE] or [/EXPLOSIVE] (Emotion)
+    // (\[[a-z]+ ?[1-4]?\])         -> Group 2: Matches [geng 1] (Pronunciation)
+
+    return escaped.replace(/(\[[A-Z_]+\]|\[\/[A-Z_]+\])|(\[[a-z]+ ?[1-4]?\])/g, (match, emotion, pronunciation) => {
+        if (emotion) {
+            return `<span class="tag-highlight">${match}</span>`;
         }
-        // HTML escape basic chars for safety if needed, but innerText usually handles it on input
-        // For render, we must be careful.
-        // Simple escape:
-        return part.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    }).join('');
+        if (pronunciation) {
+            return `<span class="pronunciation-highlight">${match}</span>`;
+        }
+        return match;
+    });
 };
 
 /*
@@ -195,18 +201,34 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
         <div className="flex-1 flex flex-col bg-[var(--color-bg-primary)] overflow-hidden rounded-xl border border-[var(--color-border-subtle)]">
             <style>{`
                 .tag-highlight {
-                    color: var(--color-accent);
+                    color: #00c951; /* Green-500 */
+                    font-family: 'JetBrains Mono', monospace;
+                    font-weight: bold;
+                    font-size: 0.75em;
+                }
+                .pronunciation-highlight {
+                    color: #F59E0B; /* Amber-500 */
                     font-family: 'JetBrains Mono', monospace;
                     font-weight: bold;
                     font-size: 0.75em;
                 }
                 [contenteditable]:empty:before {
                     content: attr(placeholder);
-                    color: rgba(var(--color-text-secondary-rgb), 0.4);
+                    color: var(--color-text-secondary);
+                    opacity: 0.6;
                     pointer-events: none;
                     display: block;
                 }
-                /* Hide scrollbar for cleaner look if desired, or keep custom one */
+                /* Use a class to force placeholder when text is empty string (handling <br> remnants) */
+                .force-placeholder:before {
+                    content: attr(placeholder);
+                    color: var(--color-text-secondary);
+                    opacity: 0.6;
+                    pointer-events: none;
+                    position: absolute;
+                    left: 1.5rem; /* Match px-6 padding */
+                    top: 0;
+                }
             `}</style>
 
             {/* Prompt Area */}
@@ -219,7 +241,7 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
                     value={prompt}
                     onChange={(e) => onPromptChange(e.target.value)}
                     placeholder="输入指令，例如：用沉稳有磁性的男声朗读，在重点词汇处稍作停顿..."
-                    className="w-full h-48 bg-transparent border-none resize-none px-6 focus:ring-0 text-sm leading-6 placeholder-[var(--color-text-secondary)]/40 focus:outline-none text-[var(--color-text-primary)] font-sans"
+                    className="w-full h-48 bg-transparent border-none resize-none px-6 focus:ring-0 text-sm leading-6 focus:outline-none text-[var(--color-text-primary)] font-sans"
                     spellCheck={false}
                 />
             </div>
@@ -244,7 +266,7 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
                         ref={editorRef}
                         contentEditable
                         onInput={handleInput}
-                        className="absolute inset-0 w-full h-full px-6 overflow-y-auto custom-scrollbar bg-transparent border-none focus:ring-0 text-[15px] leading-8 text-[var(--color-text-primary)] focus:outline-none whitespace-pre-wrap break-words font-sans outline-none"
+                        className={`absolute inset-0 w-full h-full px-6 overflow-y-auto custom-scrollbar bg-transparent border-none focus:ring-0 text-[15px] leading-8 text-[var(--color-text-primary)] focus:outline-none whitespace-pre-wrap break-words font-sans outline-none ${(!text || text === '\n') ? 'force-placeholder' : ''}`}
                         placeholder="在此输入需要转换的内容..."
                         spellCheck={false}
                     />

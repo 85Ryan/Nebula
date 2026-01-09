@@ -41,7 +41,18 @@ export const generateSpeech = async ({ text, voice, model, prompt }: GenerateSpe
     try {
         // Combine Emotion Definitions + User System Prompt + Text
         // We prepend instructions so the model knows the "Stage Directions" before processing the text lines.
-        const finalContent = `${EMOTION_DEFINITIONS}\n\n${prompt ? `### USER INSTRUCTIONS\n${prompt}\n\n` : ''}### SCRIPT TO READ\n${text}`;
+        const PRONUNCIATION_GUIDE = `
+[PRONUNCIATION CORRECTION GUIDE]
+You may encounter text in the format: "Character[pinyin tone]".
+- "Character" is the Chinese character to be read.
+- "[pinyin tone]" dictates EXACTLY how it should be pronounced.
+- Tones are digits 1-4 (1=flat, 2=rising, 3=dipping, 4=falling). No digit means neutral tone.
+- EXAMPLE: "更[geng 1]新" -> Read "更" as "gēng".
+- EXAMPLE: "漂[piao 4]亮" -> Read "漂" as "piào".
+- CRITICAL: Do NOT read the brackets or the pinyin text aloud. Only read the character with the specified pronunciation.
+`;
+
+        const finalContent = `${EMOTION_DEFINITIONS}\n\n${PRONUNCIATION_GUIDE}\n\n${prompt ? `### USER INSTRUCTIONS\n${prompt}\n\n` : ''}### SCRIPT TO READ\n${text}`;
 
         const response = await genAI.models.generateContent({
             model: model,
