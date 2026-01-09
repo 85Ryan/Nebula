@@ -1,5 +1,5 @@
+import React, { useRef, useState, useLayoutEffect } from 'react';
 import { ToneToolbar } from './ToneToolbar';
-import { useRef, useEffect } from 'react';
 
 interface TextInputProps {
     text: string;
@@ -11,16 +11,16 @@ interface TextInputProps {
 
 // Helper: highlight [TAG] text
 const highlightText = (text: string) => {
-    if (!text) return '';
+    if (!text) return '<br/>'; // Ensure height with <br/> if empty
 
-    // Escape HTML first to prevent injection from user content
-    const escaped = text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    // Escape HTML first
+    const escaped = text
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-    // Regex Explanation:
-    // (\[[A-Z_]+\]|\[\/[A-Z_]+\])  -> Group 1: Matches [EXPLOSIVE] or [/EXPLOSIVE] (Emotion)
-    // (\[[a-z]+ ?[1-4]?\])         -> Group 2: Matches [geng 1] (Pronunciation)
-
-    return escaped.replace(/(\[[A-Z_]+\]|\[\/[A-Z_]+\])|(\[[a-z]+ ?[1-4]?\])/g, (match, emotion, pronunciation) => {
+    // Highlight tags
+    let highlighted = escaped.replace(/(\[[A-Z_]+\]|\[\/[A-Z_]+\])|(\[[a-z]+ ?[1-4]?\])/g, (match, emotion, pronunciation) => {
         if (emotion) {
             return `<span class="tag-highlight">${match}</span>`;
         }
@@ -29,170 +29,101 @@ const highlightText = (text: string) => {
         }
         return match;
     });
-};
 
-/*
- * Cursor Management Helpers
- */
-const getCaretCharacterOffsetWithin = (element: HTMLElement) => {
-    let caretOffset = 0;
-    const doc = element.ownerDocument || document;
-    const win = doc.defaultView || window;
-    const sel = win.getSelection();
-    if (sel && sel.rangeCount > 0) {
-        const range = sel.getRangeAt(0);
-        const preCaretRange = range.cloneRange();
-        preCaretRange.selectNodeContents(element);
-        preCaretRange.setEnd(range.endContainer, range.endOffset);
-        caretOffset = preCaretRange.toString().length;
+    // Handle newlines for display
+    // We add a zero-width space after the last newline to ensure the container expands if the text ends with a newline
+    if (highlighted.endsWith('\n')) {
+        highlighted += '<br/>';
     }
-    return caretOffset;
-};
 
-const setCaretPosition = (element: HTMLElement, offset: number) => {
-    const createRange = (node: Node, chars: { count: number }, range?: Range): Range => {
-        if (!range) {
-            range = document.createRange();
-            range.selectNode(node);
-            range.setStart(node, 0);
-        }
-        if (chars.count === 0) {
-            range.setEnd(node, chars.count);
-        } else if (node && chars.count > 0) {
-            if (node.nodeType === Node.TEXT_NODE) {
-                if (node.textContent && node.textContent.length < chars.count) {
-                    chars.count -= node.textContent.length;
-                } else {
-                    range.setEnd(node, chars.count);
-                    chars.count = 0;
-                }
-            } else {
-                for (let lp = 0; lp < node.childNodes.length; lp++) {
-                    range = createRange(node.childNodes[lp], chars, range);
-                    if (chars.count === 0) {
-                        break;
-                    }
-                }
-            }
-        }
-        return range;
-    };
-
-    const range = createRange(element, { count: offset });
-    if (range) {
-        range.collapse(false);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-    }
+    return highlighted.replace(/\n/g, '<br/>');
 };
 
 export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputProps) {
-    const editorRef = useRef<HTMLDivElement>(null);
-    const cursorOffset = useRef<number>(0);
+    const textareaRef = useRef<HTMLTextAreaElement>(null);
+    const backdropRef = useRef<HTMLDivElement>(null);
+    const [scrollTop, setScrollTop] = useState(0);
 
-    // Sync external text to contentEditable innerHTML
-    // We only update if semantic text content differs to avoid recreating DOM on every cursor move
-    useEffect(() => {
-        if (editorRef.current) {
-            const currentText = editorRef.current.innerText;
-            // If text prop is different from current innerText, it means external update (e.g. file switch, or toolbar insert)
-            // But we must NOT update if the difference is just due to cursor movement or simple typing which already triggered onChange
-            // Wait, onChange updates 'text'. 'text' updates here.
-            // If we type 'a', onChange('a'), text becomes 'a'. Here currentText is 'a'. Match. No render.
-            // But if we want highlighting, we MUST render HTML if HTML doesn't match expected highlight.
-            if (currentText !== text) {
-                // External change (or very fast typing?)
-                editorRef.current.innerHTML = highlightText(text);
-                // cursorOffset.current might be stale if external change.
-            } else {
-                // Text matches, but does HTML match highlighting?
-                // Example: typed "[", text is "[". highlightText("[") is "[".
-                // Typed "TAG]", text is "[TAG]". highlightText is <span>[TAG]</span>.
-                // current innerHTML might be "[TAG]". We need to upgrade it to span.
-                const expectedHtml = highlightText(text);
-                if (editorRef.current.innerHTML !== expectedHtml) {
-                    // Save cursor
-                    const savedOffset = cursorOffset.current; // Use tracked offset or get current?
-                    // Better get current real numeric offset from DOM before we trash it
-                    // But we might not have focus if this is a delayed effect?
-                    // Safe to check focus.
-                    const isFocused = document.activeElement === editorRef.current;
-                    let realOffset = savedOffset;
-                    if (isFocused) {
-                        realOffset = getCaretCharacterOffsetWithin(editorRef.current);
-                    }
-
-                    editorRef.current.innerHTML = expectedHtml;
-
-                    if (isFocused) {
-                        setCaretPosition(editorRef.current, realOffset);
-                    }
-                }
-            }
+    // Sync scroll from textarea to backdrop
+    const handleScroll = (e: React.UIEvent<HTMLTextAreaElement>) => {
+        const top = e.currentTarget.scrollTop;
+        if (backdropRef.current) {
+            backdropRef.current.scrollTop = top;
         }
-    }, [text]);
+        setScrollTop(top);
+    };
 
-    const handleInput = () => {
-        if (editorRef.current) {
-            const newText = editorRef.current.innerText;
-            // Save cursor position right after input
-            cursorOffset.current = getCaretCharacterOffsetWithin(editorRef.current);
-            if (newText !== text) {
-                onChange(newText);
+    // Ensure strict sync on every render/text change
+    useLayoutEffect(() => {
+        if (textareaRef.current && backdropRef.current) {
+            backdropRef.current.scrollTop = textareaRef.current.scrollTop;
+        }
+    }, [text, scrollTop]);
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+        if (e.key === 'Backspace') {
+            const textarea = e.currentTarget;
+            const { selectionStart, selectionEnd, value } = textarea;
+
+            // Only handle if no text is selected (cursor is collapsed)
+            if (selectionStart === selectionEnd && selectionStart > 0) {
+                const textBeforeCursor = value.slice(0, selectionStart);
+
+                // Matches format like [TAG], [/TAG], or [pinyin] at the end of string
+                // Corresponds to regex in highlightText: (\[[A-Z_]+\]|\[\/[A-Z_]+\])|(\[[a-z]+ ?[1-4]?\])
+                const tagRegex = /((?:\[[A-Z_]+\])|(?:\[\/[A-Z_]+\])|(?:\[[a-z]+ ?[1-4]?\]))$/;
+                const match = textBeforeCursor.match(tagRegex);
+
+                if (match) {
+                    e.preventDefault();
+                    const tag = match[0];
+                    const newText = value.slice(0, selectionStart - tag.length) + value.slice(selectionStart);
+                    const newCursorPos = selectionStart - tag.length;
+
+                    onChange(newText);
+
+                    // Restore cursor
+                    setTimeout(() => {
+                        if (textareaRef.current) {
+                            textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
+                        }
+                    }, 0);
+                }
             }
         }
     };
 
     const handleToneInsert = (tag: string) => {
-        const editor = editorRef.current;
-        if (!editor) return;
+        const textarea = textareaRef.current;
+        if (!textarea) return;
 
-        // Ensure we have focus or use stored range?
-        // Simpler: Just append if not focused, or insert at cursor.
-        // We need to use Selection API on the DIV
-        let start = text.length;
-        let end = text.length;
-
-        const sel = window.getSelection();
-        if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-            // Calculate offset.
-            // This is tricky with nested nodes.
-            // We use our helper if possible? getCaretCharacterOffsetWithin gives single offset.
-            // For selection range, we need start and end.
-            const range = sel.getRangeAt(0);
-            const preRange = range.cloneRange();
-            preRange.selectNodeContents(editor);
-            preRange.setEnd(range.startContainer, range.startOffset);
-            start = preRange.toString().length;
-            end = start + range.toString().length;
-        }
+        const start = textarea.selectionStart;
+        const end = textarea.selectionEnd;
+        const currentText = textarea.value;
 
         const prefix = `[${tag}]`;
         const suffix = `[/${tag}]`;
 
         let newText = '';
+        let newCursorPos = 0;
+
         if (start === end) {
-            newText = text.substring(0, start) + prefix + suffix + text.substring(end);
+            // Insert at cursor
+            newText = currentText.substring(0, start) + prefix + suffix + currentText.substring(end);
+            newCursorPos = start + prefix.length;
         } else {
-            newText = text.substring(0, start) + prefix + text.substring(start, end) + suffix + text.substring(end);
+            // Wrap selection
+            newText = currentText.substring(0, start) + prefix + currentText.substring(start, end) + suffix + currentText.substring(end);
+            newCursorPos = start + prefix.length + (end - start) + suffix.length;
         }
 
         onChange(newText);
 
-        // Focus and set cursor
+        // Restore focus and set caret
         setTimeout(() => {
-            if (editorRef.current) {
-                editorRef.current.focus();
-                // Set cursor between tags or after block
-                let newPos = 0;
-                if (start === end) {
-                    newPos = start + prefix.length;
-                } else {
-                    newPos = start + prefix.length + (end - start) + suffix.length;
-                }
-                setCaretPosition(editorRef.current, newPos);
-                cursorOffset.current = newPos;
+            if (textareaRef.current) {
+                textareaRef.current.focus();
+                textareaRef.current.setSelectionRange(newCursorPos, newCursorPos);
             }
         }, 0);
     };
@@ -201,33 +132,52 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
         <div className="flex-1 flex flex-col bg-[var(--color-bg-primary)] overflow-hidden rounded-xl border border-[var(--color-border-subtle)]">
             <style>{`
                 .tag-highlight {
-                    color: #00c951; /* Green-500 */
-                    font-family: 'JetBrains Mono', monospace;
-                    font-weight: bold;
-                    font-size: 0.75em;
+                    color: #00c951;
                 }
                 .pronunciation-highlight {
-                    color: #F59E0B; /* Amber-500 */
-                    font-family: 'JetBrains Mono', monospace;
-                    font-weight: bold;
-                    font-size: 0.75em;
+                    color: #F59E0B;
                 }
-                [contenteditable]:empty:before {
-                    content: attr(placeholder);
-                    color: var(--color-text-secondary);
-                    opacity: 0.6;
-                    pointer-events: none;
-                    display: block;
+                /* Shared font settings are CRITICAL for alignment */
+                .editor-shared {
+                    font-size: 15px;
+                    line-height: 2; 
+                    letter-spacing: 0px; 
+                    font-variant-ligatures: none;
+                    white-space: pre-wrap;
+                    word-wrap: break-word;
+                    overflow-wrap: break-word;
+                    box-sizing: border-box;
                 }
-                /* Use a class to force placeholder when text is empty string (handling <br> remnants) */
-                .force-placeholder:before {
-                    content: attr(placeholder);
-                    color: var(--color-text-secondary);
-                    opacity: 0.6;
+                .editor-textarea {
+                    color: transparent;
+                    caret-color: var(--color-text-primary);
+                    background: transparent;
+                    resize: none;
+                    width: 100%;
+                    height: 100%;
+                    border: none;
+                    outline: none;
+                    z-index: 10;
+                }
+                .editor-backdrop {
+                    color: var(--color-text-primary);
+                    background: transparent;
+                    z-index: 0;
                     pointer-events: none;
-                    position: absolute;
-                    left: 1.5rem; /* Match px-6 padding */
-                    top: 0;
+                    width: 100%;
+                    height: 100%;
+                    overflow: hidden;
+                    border: none;
+                }
+                
+                .editor-textarea::selection {
+                    background-color: rgba(59, 130, 246, 0.3);
+                    color: transparent;
+                }
+                
+                .editor-textarea::placeholder {
+                    color: var(--color-text-secondary);
+                    opacity: 0.5;
                 }
             `}</style>
 
@@ -247,7 +197,7 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
             </div>
 
             {/* Main Content Area */}
-            <div className="flex-1 flex flex-col relative py-4">
+            <div className="flex-1 flex flex-col relative py-4 min-h-0">
                 <div className="flex items-center justify-between px-6 pb-2">
                     <div className="flex items-center gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500"></div>
@@ -260,15 +210,25 @@ export function TextInput({ text, onChange, prompt, onPromptChange }: TextInputP
                     <ToneToolbar onInsert={handleToneInsert} />
                 </div>
 
-                {/* ContentEditable Editor */}
-                <div className="relative flex-1 w-full min-h-0">
+                {/* Stacked Editor Area */}
+                <div className="relative flex-1 w-full min-h-0 container-shared">
+                    {/* Backdrop (Highlighter) */}
                     <div
-                        ref={editorRef}
-                        contentEditable
-                        onInput={handleInput}
-                        className={`absolute inset-0 w-full h-full px-6 overflow-y-auto custom-scrollbar bg-transparent border-none focus:ring-0 text-[15px] leading-8 text-[var(--color-text-primary)] focus:outline-none whitespace-pre-wrap break-words font-sans outline-none ${(!text || text === '\n') ? 'force-placeholder' : ''}`}
-                        placeholder="在此输入需要转换的内容..."
+                        ref={backdropRef}
+                        className="absolute inset-0 editor-shared editor-backdrop px-6"
+                        dangerouslySetInnerHTML={{ __html: highlightText(text) }}
+                    />
+
+                    {/* Foreground (Input) */}
+                    <textarea
+                        ref={textareaRef}
+                        value={text}
+                        onChange={(e) => onChange(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        onScroll={handleScroll}
                         spellCheck={false}
+                        className="absolute inset-0 editor-shared editor-textarea px-6 custom-scrollbar"
+                        placeholder="在此输入需要转换的内容..."
                     />
                 </div>
 
